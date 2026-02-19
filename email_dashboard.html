@@ -1,0 +1,223 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Forwarding Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            color: #94a3b8;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+        
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .instructions {
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
+            border: 1px solid rgba(59,130,246,0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .instructions h2 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .instructions ol {
+            color: #94a3b8;
+            margin-left: 1.5rem;
+            line-height: 1.8;
+        }
+        
+        .instructions code {
+            background: #1e293b;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            color: #3b82f6;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+        }
+        
+        th {
+            text-align: left;
+            padding: 1rem;
+            background: rgba(255,255,255,0.03);
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .risk-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .risk-critical { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .risk-high { background: rgba(239,68,68,0.15); color: #f87171; }
+        .risk-medium { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .risk-low { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .risk-safe { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        
+        .footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: #475569;
+            font-size: 0.875rem;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Email Forwarding Dashboard</h1>
+            <p>Forward suspicious emails to get instant AI-powered analysis</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Scans</div>
+                <div class="stat-value">{{ total_scans }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">High Risk</div>
+                <div class="stat-value" style="color: #ef4444;">{{ high_risk }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Medium Risk</div>
+                <div class="stat-value" style="color: #fbbf24;">{{ medium_risk }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Low Risk</div>
+                <div class="stat-value" style="color: #4ade80;">{{ low_risk }}</div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h2>📋 How to Use</h2>
+            <ol>
+                <li>Forward suspicious emails to <code>{{ email_address }}</code></li>
+                <li>Include <code>#scan</code> in the subject line</li>
+                <li>You'll receive an automated reply with risk analysis</li>
+                <li>Results appear below within seconds</li>
+            </ol>
+        </div>
+        
+        <h2 style="margin: 2rem 0 1rem;">Recent Scans</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Sender</th>
+                    <th>Subject</th>
+                    <th>Score</th>
+                    <th>Risk Level</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for scan in recent_scans %}
+                <tr>
+                    <td>{{ scan[0] }}</td>
+                    <td>{{ scan[1][:50] }}{% if scan[1]|length > 50 %}...{% endif %}</td>
+                    <td><strong>{{ scan[2] }}%</strong></td>
+                    <td>
+                        <span class="risk-badge 
+                            {% if 'CRITICAL' in scan[3] %}risk-critical
+                            {% elif 'HIGH' in scan[3] %}risk-high
+                            {% elif 'MEDIUM' in scan[3] %}risk-medium
+                            {% elif 'LOW' in scan[3] %}risk-low
+                            {% else %}risk-safe{% endif %}">
+                            {{ scan[3] }}
+                        </span>
+                    </td>
+                    <td>{{ scan[4][:19] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="no-data">
+                        📭 No scans yet. Forward an email with <code>#scan</code> to get started!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>AI Scam Detector • Email Forwarding Service • Real-time Protection</p>
+        </div>
+    </div>
+</body>
+</html>
