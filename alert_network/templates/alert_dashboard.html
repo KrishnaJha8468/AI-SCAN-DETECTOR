@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Alert Network - Community Scam Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #3b82f6;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        
+        .alert-banner {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .alert-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .alert-badge {
+            background: white;
+            color: #dc2626;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .alert-item {
+            background: rgba(239,68,68,0.1);
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        
+        .alert-item h3 {
+            color: #ef4444;
+            margin-bottom: 5px;
+        }
+        
+        .alert-item p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        
+        .risk-high { color: #ef4444; font-weight: 600; }
+        .risk-medium { color: #eab308; font-weight: 600; }
+        .risk-low { color: #4ade80; font-weight: 600; }
+        
+        .verified-badge {
+            background: #4ade80;
+            color: #0f172a;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .vote-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .vote-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .vote-btn:hover {
+            background: #3b82f6;
+        }
+        
+        .pattern-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .pattern-count {
+            background: #3b82f6;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #64748b;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 Alert Network</h1>
+            <p>Community-Powered Scam Detection • Real-time Alerts • Collaborative Security</p>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div>👥 Community</div>
+                <div class="stat-value">{{ total_users }}</div>
+                <div class="stat-label">Active Members</div>
+            </div>
+            <div class="stat-card">
+                <div>📊 Reports</div>
+                <div class="stat-value">{{ total_reports }}</div>
+                <div class="stat-label">Total Scams Reported</div>
+            </div>
+            <div class="stat-card">
+                <div>✅ Verified</div>
+                <div class="stat-value">{{ verified_reports }}</div>
+                <div class="stat-label">Community Verified</div>
+            </div>
+            <div class="stat-card">
+                <div>🚨 Active</div>
+                <div class="stat-value">{{ active_alerts_count }}</div>
+                <div class="stat-label">Live Alerts</div>
+            </div>
+        </div>
+        
+        <!-- Active Alerts -->
+        {% if active_alerts %}
+        <div class="alert-banner">
+            <span class="alert-title">🚨 LIVE ALERTS ACTIVE</span>
+            <span class="alert-badge">{{ active_alerts_count }} Active</span>
+        </div>
+        {% endif %}
+        
+        <!-- Main Grid -->
+        <div class="grid-2">
+            <!-- Left Column - Recent Reports -->
+            <div class="card">
+                <div class="card-title">📋 Recent Community Reports</div>
+                {% for report in recent_reports %}
+                <div class="report-item">
+                    <div style="flex: 1;">
+                        <div>
+                            <strong>{{ report[2]|upper }}</strong>
+                            {% if report[6] %}
+                            <span class="verified-badge">✓ Verified</span>
+                            {% endif %}
+                        </div>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">
+                            From: {{ report[1][:20] }} • {{ report[4][:16] }}
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin: 0 10px;">
+                        <span class="risk-{% if report[3] >= 70 %}high{% elif report[3] >= 40 %}medium{% else %}low{% endif %}">
+                            {{ report[3] }}%
+                        </span>
+                    </div>
+                    <div class="vote-buttons">
+                        <button class="vote-btn" onclick="vote('{{ report[0] }}', 'up')">👍</button>
+                        <span>{{ report[5] }}</span>
+                        <button class="vote-btn" onclick="vote('{{ report[0] }}', 'down')">👎</button>
+                    </div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: #64748b;">No reports yet. Be the first to report a scam!</p>
+                {% endfor %}
+            </div>
+            
+            <!-- Right Column - Active Alerts & Patterns -->
+            <div>
+                <!-- Active Alerts -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-title">🚨 Active Alerts</div>
+                    {% for alert in active_alerts %}
+                    <div class="alert-item">
+                        <h3>{{ alert[1] }}</h3>
+                        <p>{{ alert[2] }}</p>
+                        <small>{{ alert[4][:16] }}</small>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: #64748b;">No active alerts</p>
+                    {% endfor %}
+                </div>
+                
+                <!-- Top Patterns -->
+                <div class="card">
+                    <div class="card-title">🔍 Trending Scam Patterns</div>
+                    {% for pattern in top_patterns %}
+                    <div class="pattern-item">
+                        <span>
+                            <span style="color: #3b82f6;">{{ pattern[1] }}</span> 
+                            {{ pattern[0] }}
+                        </span>
+                        <span class="pattern-count">{{ pattern[2] }} reports</span>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: #64748b;">No patterns yet</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Report Scam Form -->
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-title">📝 Report a Scam</div>
+            <div style="display: grid; gap: 15px;">
+                <input type="email" id="reportEmail" placeholder="Your Email" style="padding: 10px; background: #1e293b; border: 1px solid #334155; color: white; border-radius: 5px;">
+                <select id="reportType" style="padding: 10px; background: #1e293b; border: 1px solid #334155; color: white; border-radius: 5px;">
+                    <option value="url">Suspicious URL</option>
+                    <option value="email">Phishing Email</option>
+                    <option value="phone">Scam Call</option>
+                    <option value="sms">SMS Scam</option>
+                    <option value="other">Other</option>
+                </select>
+                <input type="text" id="reportContent" placeholder="URL / Phone Number / Email" style="padding: 10px; background: #1e293b; border: 1px solid #334155; color: white; border-radius: 5px;">
+                <textarea id="reportDescription" placeholder="Description" rows="3" style="padding: 10px; background: #1e293b; border: 1px solid #334155; color: white; border-radius: 5px;"></textarea>
+                <button onclick="submitReport()" style="padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">Submit Report</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🛡️ AI Scam Detector • Alert Network • Community Powered Security</p>
+            <p style="font-size: 0.8rem;">Report scams, protect others, earn reputation</p>
+        </div>
+    </div>
+    
+    <script>
+        function vote(reportId, type) {
+            const email = prompt("Enter your email to vote:");
+            if (!email) return;
+            
+            fetch('/api/vote', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_email: email,
+                    report_id: reportId,
+                    vote_type: type
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Vote recorded!');
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            });
+        }
+        
+        function submitReport() {
+            const email = document.getElementById('reportEmail').value;
+            const type = document.getElementById('reportType').value;
+            const content = document.getElementById('reportContent').value;
+            const description = document.getElementById('reportDescription').value;
+            
+            if (!email) {
+                alert('Please enter your email');
+                return;
+            }
+            
+            fetch('/api/report', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_email: email,
+                    type: type,
+                    content: content,
+                    url: type === 'url' ? content : '',
+                    phone: type === 'phone' ? content : '',
+                    email_sender: type === 'email' ? content : '',
+                    description: description,
+                    risk_score: 50
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Report submitted! Thank you for helping protect others.');
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
