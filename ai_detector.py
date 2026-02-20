@@ -1,11 +1,10 @@
-# ai_detector.py - AI-generated text detection (Enhanced version)
-
+# ai_detector.py 
 import re
 import math
 
 class AIDetector:
     def __init__(self):
-        # AI-generated text patterns (EXPANDED)
+        
         self.ai_patterns = {
             'transition_phrases': [
                 'in conclusion', 'furthermore', 'moreover', 'additionally',
@@ -240,4 +239,5 @@ class AIDetector:
         elif score >= 15:
             return "🟢 LOW AI RISK", "Probably human-written"
         else:
+
             return "✅ VERY LOW AI RISK", "Almost certainly human-written"
