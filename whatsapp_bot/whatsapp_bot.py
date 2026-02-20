@@ -1,4 +1,4 @@
-# whatsapp_bot.py - Complete WhatsApp Scam Detector Bot
+# whatsapp_bot.py 
 
 from flask import Flask, request, jsonify, render_template
 from twilio.twiml.messaging_response import MessagingResponse
@@ -82,11 +82,10 @@ def init_db():
 init_db()
 
 # Twilio WhatsApp credentials
-TWILIO_ACCOUNT_SID = 'TWILIO_ACCOUNT_SID'  # You'll update this
-TWILIO_AUTH_TOKEN = 'TWILIO_AUTH_TOKEN'  # You'll update this
-TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886'            # Sandbox number (DO NOT CHANGE)
-TWILIO_PHONE_NUMBER = '+18783091374'                         # Your trial number
-
+TWILIO_ACCOUNT_SID = 'TWILIO_ACCOUNT_SID'  
+TWILIO_AUTH_TOKEN = 'TWILIO_AUTH_TOKEN'  
+TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886'         
+TWILIO_PHONE_NUMBER = '+18783091374'                        
 @app.route('/')
 def index():
     return render_template('whatsapp.html')
