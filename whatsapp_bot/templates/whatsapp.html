@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Scam Detector</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 800px; width: 100%; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 30px; margin: 20px 0; }
+        .whatsapp-number { background: #25D366; color: white; padding: 20px; border-radius: 15px; text-align: center; font-size: 2rem; font-weight: bold; margin-bottom: 30px; }
+        .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 30px 0; }
+        .step { text-align: center; }
+        .step-number { width: 40px; height: 40px; background: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-weight: bold; }
+        .btn { display: inline-block; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 10px; }
+        .btn-whatsapp { background: #25D366; color: white; }
+        .btn-demo { background: #3b82f6; color: white; }
+        .demo-box { background: #1e293b; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .user-message { background: #3b82f6; color: white; padding: 10px 15px; border-radius: 20px 20px 20px 5px; max-width: 70%; margin: 10px 0; }
+        .bot-message { background: #334155; color: white; padding: 10px 15px; border-radius: 20px 20px 5px 20px; max-width: 70%; margin: 10px 0 10px auto; white-space: pre-line; }
+        .footer { text-align: center; margin-top: 40px; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 WhatsApp Scam Detector</h1>
+            <p>Send suspicious messages on WhatsApp • Get instant AI analysis</p>
+        </div>
+        
+        <div class="card">
+            <div class="whatsapp-number">9742455375</div>
+            
+            <div class="steps">
+                <div class="step"><div class="step-number">1</div><div>Save Number</div></div>
+                <div class="step"><div class="step-number">2</div><div>Send "krishnaeclipsee@gmail.com"</div></div>
+                <div class="step"><div class="step-number">3</div><div>Start Scanning</div></div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="https://wa.me/14155238886?text=join%20example-sandbox" class="btn btn-whatsapp" target="_blank">📱 Start WhatsApp Chat</a>
+                <button class="btn btn-demo" onclick="showDemo()">🔍 Try Demo</button>
+            </div>
+        </div>
+        
+        <div class="card" id="demo" style="display: none;">
+            <h2>Live Demo</h2>
+            <div class="demo-box" id="demoMessages">
+                <div class="user-message">URGENT: Your PayPal account suspended! bit.ly/3xY7z8K</div>
+                <div class="bot-message" id="demoResponse">Click "Test Demo" to analyze</div>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <input type="text" id="testMessage" placeholder="Enter test message..." style="width: 70%; padding: 10px; border-radius: 5px; border: none;">
+                <button class="btn btn-demo" onclick="testMessage()">Test Demo</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🛡️ AI Scam Detector • WhatsApp Protection • Free to use</p>
+        </div>
+    </div>
+    
+    <script>
+        function showDemo() {
+            document.getElementById('demo').style.display = 'block';
+        }
+        
+        function testMessage() {
+            const msg = document.getElementById('testMessage').value;
+            if (!msg) return;
+            
+            fetch('/api/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg})
+            })
+            .then(res => res.json())
+            .then(data => {
+                let response = '';
+                if (data.score >= 70) response += '🚨 HIGH RISK SCAM!\n';
+                else if (data.score >= 40) response += '⚠️ MEDIUM RISK\n';
+                else response += '✅ SAFE\n';
+                
+                response += `Risk Score: ${data.score}%\n`;
+                if (data.findings && data.findings.length) {
+                    response += '\nFindings:\n' + data.findings.join('\n');
+                }
+                
+                document.getElementById('demoResponse').textContent = response;
+                document.getElementById('demoResponse').style.whiteSpace = 'pre-line';
+            });
+        }
+    </script>
+</body>
+</html>
