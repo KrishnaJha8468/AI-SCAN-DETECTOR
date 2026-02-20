@@ -82,8 +82,8 @@ def init_db():
 init_db()
 
 # Twilio WhatsApp credentials
-TWILIO_ACCOUNT_SID = 'AC416a37c5eb2ff3dfba89ef9ba2c56411'  # You'll update this
-TWILIO_AUTH_TOKEN = '7380f418667fe0d730411be96208f21f'  # You'll update this
+TWILIO_ACCOUNT_SID = 'TWILIO_ACCOUNT_SID'  # You'll update this
+TWILIO_AUTH_TOKEN = 'TWILIO_AUTH_TOKEN'  # You'll update this
 TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886'            # Sandbox number (DO NOT CHANGE)
 TWILIO_PHONE_NUMBER = '+18783091374'                         # Your trial number
 
