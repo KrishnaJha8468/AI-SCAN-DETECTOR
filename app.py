@@ -12,6 +12,13 @@ from ai_detector import AIDetector
 import time
 import re
 
+# ===== LOGIN SYSTEM (AFTER PAGE CONFIG) =====
+from login import check_password
+
+# Check if user is logged in
+if not check_password():
+    st.stop()  # Stops the app from loading further
+
 # For browser extension API
 try:
     from flask import Flask, request, jsonify
