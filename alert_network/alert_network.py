@@ -1,604 +1,306 @@
-# alert_network.py - Community-Powered Scam Alert Network
-
-from flask import Flask, request, jsonify, render_template
-import sqlite3
-import datetime
-import hashlib
 import json
+import hashlib
+import datetime
 import os
-import threading
-import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+import pandas as pd
+from collections import Counter
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
-
-# Database setup
-DATABASE = 'alert_network.db'
-
-def init_db():
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
+class AlertNetwork:
+    """Community-powered scam alert system"""
     
-    # Users table
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  email TEXT UNIQUE,
-                  phone TEXT,
-                  whatsapp TEXT,
-                  location TEXT,
-                  verified BOOLEAN DEFAULT 0,
-                  join_date DATETIME,
-                  reputation INTEGER DEFAULT 0)''')
-    
-    # Scam reports table
-    c.execute('''CREATE TABLE IF NOT EXISTS reports
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  scam_type TEXT,
-                  content TEXT,
-                  url TEXT,
-                  phone_number TEXT,
-                  email_sender TEXT,
-                  description TEXT,
-                  risk_score INTEGER,
-                  timestamp DATETIME,
-                  location TEXT,
-                  verified BOOLEAN DEFAULT 0,
-                  votes INTEGER DEFAULT 0,
-                  FOREIGN KEY (user_id) REFERENCES users (id))''')
-    
-    # Alerts table
-    c.execute('''CREATE TABLE IF NOT EXISTS alerts
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  report_id INTEGER,
-                  title TEXT,
-                  message TEXT,
-                  severity TEXT,
-                  affected_regions TEXT,
-                  timestamp DATETIME,
-                  active BOOLEAN DEFAULT 1,
-                  FOREIGN KEY (report_id) REFERENCES reports (id))''')
-    
-    # User votes table
-    c.execute('''CREATE TABLE IF NOT EXISTS votes
-                 (user_id INTEGER,
-                  report_id INTEGER,
-                  vote_type TEXT,
-                  timestamp DATETIME,
-                  PRIMARY KEY (user_id, report_id))''')
-    
-    # Scam patterns database
-    c.execute('''CREATE TABLE IF NOT EXISTS patterns
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  pattern TEXT,
-                  pattern_type TEXT,
-                  severity TEXT,
-                  occurrences INTEGER DEFAULT 1,
-                  first_seen DATETIME,
-                  last_seen DATETIME)''')
-    
-    conn.commit()
-    conn.close()
-    print("✅ Alert Network Database initialized")
-
-init_db()
-
-# ============================================================================
-# USER MANAGEMENT
-# ============================================================================
-
-def register_user(email, phone=None, whatsapp=None, location=None):
-    """Register a new user in the network"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    try:
-        c.execute('''INSERT INTO users 
-                     (email, phone, whatsapp, location, join_date, reputation)
-                     VALUES (?, ?, ?, ?, ?, ?)''',
-                  (email, phone, whatsapp, location, datetime.datetime.now(), 0))
-        conn.commit()
-        user_id = c.lastrowid
-        print(f"✅ New user registered: {email} (ID: {user_id})")
-        return user_id
-    except sqlite3.IntegrityError:
-        # User already exists
-        c.execute('SELECT id FROM users WHERE email = ?', (email,))
-        user_id = c.fetchone()[0]
-        return user_id
-    finally:
-        conn.close()
-
-def get_user_reputation(user_id):
-    """Get user reputation score"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute('SELECT reputation FROM users WHERE id = ?', (user_id,))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else 0
-
-def update_reputation(user_id, change):
-    """Update user reputation"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute('UPDATE users SET reputation = reputation + ? WHERE id = ?', (change, user_id))
-    conn.commit()
-    conn.close()
-
-# ============================================================================
-# SCAM REPORTING
-# ============================================================================
-
-def report_scam(user_id, scam_data):
-    """Submit a new scam report"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Extract data
-    scam_type = scam_data.get('type', 'unknown')
-    content = scam_data.get('content', '')
-    url = scam_data.get('url', '')
-    phone = scam_data.get('phone', '')
-    email = scam_data.get('email', '')
-    description = scam_data.get('description', '')
-    risk_score = scam_data.get('risk_score', 50)
-    location = scam_data.get('location', 'unknown')
-    
-    # Insert report
-    c.execute('''INSERT INTO reports 
-                 (user_id, scam_type, content, url, phone_number, email_sender, 
-                  description, risk_score, timestamp, location, verified, votes)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-              (user_id, scam_type, content, url, phone, email, description,
-               risk_score, datetime.datetime.now(), location, 0, 0))
-    
-    report_id = c.lastrowid
-    conn.commit()
-    
-    # Check for patterns
-    check_patterns(content, url, phone, email)
-    
-    # If high risk, create alert
-    if risk_score >= 70:
-        create_alert(report_id, scam_data)
-    
-    conn.close()
-    print(f"🚨 New scam report #{report_id} (Risk: {risk_score}%)")
-    return report_id
-
-def check_patterns(content, url, phone, email):
-    """Check for recurring scam patterns"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Extract potential patterns
-    patterns = []
-    
-    # URL patterns
-    if url:
-        domain = url.split('/')[2] if '://' in url else url.split('/')[0]
-        patterns.append(('url_domain', domain))
-    
-    # Phone patterns
-    if phone:
-        # Normalize phone number
-        phone_clean = ''.join(filter(str.isdigit, phone))
-        if len(phone_clean) >= 10:
-            patterns.append(('phone_prefix', phone_clean[:6]))
-    
-    # Email patterns
-    if email:
-        if '@' in email:
-            domain = email.split('@')[1]
-            patterns.append(('email_domain', domain))
-    
-    # Content patterns (keywords)
-    keywords = ['urgent', 'suspended', 'paypal', 'amazon', 'bank', 'irs', 'lottery']
-    for keyword in keywords:
-        if keyword in content.lower():
-            patterns.append(('keyword', keyword))
-    
-    # Update patterns database
-    now = datetime.datetime.now()
-    for pattern_type, pattern in patterns:
-        c.execute('''SELECT id, occurrences FROM patterns 
-                     WHERE pattern = ? AND pattern_type = ?''', (pattern, pattern_type))
-        result = c.fetchone()
+    def __init__(self, data_dir: str = "alert_data"):
+        """Initialize the alert network with a data directory"""
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(exist_ok=True)
         
-        if result:
-            # Update existing pattern
-            c.execute('''UPDATE patterns 
-                         SET occurrences = occurrences + 1, last_seen = ?
-                         WHERE id = ?''', (now, result[0]))
-        else:
-            # New pattern
-            c.execute('''INSERT INTO patterns 
-                         (pattern, pattern_type, severity, occurrences, first_seen, last_seen)
-                         VALUES (?, ?, ?, ?, ?, ?)''',
-                      (pattern, pattern_type, 'medium', 1, now, now))
-    
-    conn.commit()
-    conn.close()
-
-def create_alert(report_id, scam_data):
-    """Create a community alert for high-risk scams"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Generate alert title and message
-    scam_type = scam_data.get('type', 'unknown')
-    
-    if scam_type == 'url':
-        title = f"⚠️ Dangerous URL Detected: {scam_data.get('url', '')}"
-        message = f"Multiple users reported this URL as a scam. Risk score: {scam_data.get('risk_score', 0)}%"
-    elif scam_type == 'phone':
-        title = f"📞 Scam Call Alert: {scam_data.get('phone', '')}"
-        message = f"This phone number is being used in scam calls. Do not answer or call back."
-    elif scam_type == 'email':
-        title = f"📧 Phishing Email Alert: {scam_data.get('email', '')}"
-        message = f"Emails from this sender are fraudulent. Do not click any links."
-    else:
-        title = f"🚨 New Scam Alert: {scam_data.get('title', 'Unknown Scam')}"
-        message = scam_data.get('description', 'A new scam has been reported in your area.')
-    
-    c.execute('''INSERT INTO alerts 
-                 (report_id, title, message, severity, affected_regions, timestamp, active)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
-              (report_id, title, message, 'high', scam_data.get('location', 'all'),
-               datetime.datetime.now(), 1))
-    
-    alert_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    
-    # Notify users
-    notify_users(alert_id)
-    
-    return alert_id
-
-# ============================================================================
-# NOTIFICATIONS
-# ============================================================================
-
-def notify_users(alert_id):
-    """Send notifications to users about new alerts"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Get alert details
-    c.execute('''SELECT title, message, severity, affected_regions FROM alerts WHERE id = ?''', (alert_id,))
-    alert = c.fetchone()
-    
-    if not alert:
-        return
-    
-    title, message, severity, region = alert
-    
-    # Get users to notify
-    if region == 'all':
-        c.execute('SELECT email, phone, whatsapp FROM users WHERE verified = 1')
-    else:
-        c.execute('''SELECT email, phone, whatsapp FROM users 
-                     WHERE verified = 1 AND location = ?''', (region,))
-    
-    users = c.fetchall()
-    conn.close()
-    
-    # Send notifications (in background thread)
-    for email, phone, whatsapp in users:
-        if email:
-            thread = threading.Thread(target=send_email_alert, args=(email, title, message))
-            thread.daemon = True
-            thread.start()
+        # File paths
+        self.alerts_file = self.data_dir / "scam_alerts.json"
+        self.blocklist_file = self.data_dir / "community_blocklist.json"
+        self.stats_file = self.data_dir / "alert_stats.json"
         
-        if whatsapp:
-            # You can integrate with your WhatsApp bot here
-            pass
-
-def send_email_alert(to_email, title, message):
-    """Send email alert to user"""
-    try:
-        # Use your existing email config
-        from email_config import EMAIL_SETTINGS
+        # Initialize files if they don't exist
+        self._initialize_files()
         
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_SETTINGS['email_address']
-        msg['To'] = to_email
-        msg['Subject'] = f"🚨 Scam Alert: {title}"
-        
-        body = f"""
-        🚨 SCAM ALERT
-        
-        {title}
-        
-        {message}
-        
-        Severity: HIGH
-        Time: {datetime.datetime.now()}
-        
-        Stay safe!
-        - AI Scam Detector Community Network
-        """
-        
-        msg.attach(MIMEText(body, 'plain'))
-        
-        server = smtplib.SMTP(EMAIL_SETTINGS['smtp_server'], EMAIL_SETTINGS['smtp_port'])
-        server.starttls()
-        server.login(EMAIL_SETTINGS['email_address'], EMAIL_SETTINGS['email_password'])
-        server.send_message(msg)
-        server.quit()
-        
-        print(f"✅ Alert email sent to {to_email}")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-
-# ============================================================================
-# VOTING SYSTEM
-# ============================================================================
-
-def vote_report(user_id, report_id, vote_type):
-    """Vote on a scam report (upvote/downvote)"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
+        # Load existing data
+        self.alerts = self._load_json(self.alerts_file, [])
+        self.blocklist = self._load_json(self.blocklist_file, {})
+        self.stats = self._load_json(self.stats_file, self._get_default_stats())
     
-    # Check if already voted
-    c.execute('''SELECT vote_type FROM votes 
-                 WHERE user_id = ? AND report_id = ?''', (user_id, report_id))
-    existing = c.fetchone()
+    def _initialize_files(self):
+        """Create data files if they don't exist"""
+        if not self.alerts_file.exists():
+            self._save_json(self.alerts_file, [])
+        if not self.blocklist_file.exists():
+            self._save_json(self.blocklist_file, {})
+        if not self.stats_file.exists():
+            self._save_json(self.stats_file, self._get_default_stats())
     
-    if existing:
-        # Update vote
-        old_vote = existing[0]
-        c.execute('''UPDATE votes SET vote_type = ?, timestamp = ?
-                     WHERE user_id = ? AND report_id = ?''',
-                  (vote_type, datetime.datetime.now(), user_id, report_id))
-        
-        # Update report votes count
-        if vote_type == 'up':
-            change = 2 if old_vote == 'down' else 1
-        else:
-            change = -2 if old_vote == 'up' else -1
-        
-        c.execute('UPDATE reports SET votes = votes + ? WHERE id = ?', (change, report_id))
-    else:
-        # New vote
-        c.execute('''INSERT INTO votes (user_id, report_id, vote_type, timestamp)
-                     VALUES (?, ?, ?, ?)''',
-                  (user_id, report_id, vote_type, datetime.datetime.now()))
-        
-        # Update report votes
-        change = 1 if vote_type == 'up' else -1
-        c.execute('UPDATE reports SET votes = votes + ? WHERE id = ?', (change, report_id))
-        
-        # Update user reputation
-        rep_change = 1 if vote_type == 'up' else -1
-        c.execute('UPDATE users SET reputation = reputation + ? WHERE id = ?', (rep_change, user_id))
-    
-    conn.commit()
-    conn.close()
-    
-    # Check if report should be verified
-    check_verification(report_id)
-
-def check_verification(report_id):
-    """Auto-verify reports with enough upvotes"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    c.execute('SELECT votes FROM reports WHERE id = ?', (report_id,))
-    votes = c.fetchone()[0]
-    
-    if votes >= 5:
-        c.execute('UPDATE reports SET verified = 1 WHERE id = ?', (report_id,))
-        print(f"✅ Report #{report_id} verified by community ({votes} votes)")
-        
-        # If high risk, create alert
-        c.execute('SELECT risk_score FROM reports WHERE id = ?', (report_id,))
-        risk_score = c.fetchone()[0]
-        
-        if risk_score >= 70:
-            c.execute('''SELECT scam_type, content, url, phone_number, email_sender, description, location 
-                         FROM reports WHERE id = ?''', (report_id,))
-            report = c.fetchone()
-            
-            scam_data = {
-                'type': report[0],
-                'content': report[1],
-                'url': report[2],
-                'phone': report[3],
-                'email': report[4],
-                'description': report[5],
-                'location': report[6],
-                'risk_score': risk_score
-            }
-            create_alert(report_id, scam_data)
-    
-    conn.commit()
-    conn.close()
-
-# ============================================================================
-# API ROUTES
-# ============================================================================
-
-@app.route('/')
-def index():
-    """Alert Network Dashboard"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    # Get active alerts
-    c.execute('''SELECT id, title, message, severity, timestamp 
-                 FROM alerts WHERE active = 1 
-                 ORDER BY timestamp DESC LIMIT 10''')
-    active_alerts = c.fetchall()
-    
-    # Get recent reports
-    c.execute('''SELECT r.id, u.email, r.scam_type, r.risk_score, r.timestamp, r.votes, r.verified
-                 FROM reports r
-                 JOIN users u ON r.user_id = u.id
-                 ORDER BY r.timestamp DESC LIMIT 20''')
-    recent_reports = c.fetchall()
-    
-    # Get statistics
-    c.execute('SELECT COUNT(*) FROM reports')
-    total_reports = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM reports WHERE verified = 1')
-    verified_reports = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM alerts WHERE active = 1')
-    active_alerts_count = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM users')
-    total_users = c.fetchone()[0]
-    
-    # Get top patterns
-    c.execute('''SELECT pattern, pattern_type, occurrences 
-                 FROM patterns 
-                 ORDER BY occurrences DESC LIMIT 10''')
-    top_patterns = c.fetchall()
-    
-    conn.close()
-    
-    return render_template('alert_dashboard.html',
-                         active_alerts=active_alerts,
-                         recent_reports=recent_reports,
-                         total_reports=total_reports,
-                         verified_reports=verified_reports,
-                         active_alerts_count=active_alerts_count,
-                         total_users=total_users,
-                         top_patterns=top_patterns)
-
-@app.route('/api/report', methods=['POST'])
-def api_report():
-    """API endpoint to submit scam reports"""
-    try:
-        data = request.json
-        
-        # Get or create user
-        user_email = data.get('user_email', 'anonymous@reporter.com')
-        user_id = register_user(user_email)
-        
-        # Submit report
-        report_id = report_scam(user_id, data)
-        
-        return jsonify({
-            'success': True,
-            'report_id': report_id,
-            'message': 'Thank you for reporting! Your report helps protect others.'
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/vote', methods=['POST'])
-def api_vote():
-    """API endpoint to vote on reports"""
-    try:
-        data = request.json
-        user_email = data.get('user_email')
-        report_id = data.get('report_id')
-        vote_type = data.get('vote_type')
-        
-        if not user_email or not report_id or not vote_type:
-            return jsonify({'success': False, 'error': 'Missing data'}), 400
-        
-        user_id = register_user(user_email)
-        vote_report(user_id, report_id, vote_type)
-        
-        return jsonify({'success': True, 'message': 'Vote recorded'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/alerts', methods=['GET'])
-def api_alerts():
-    """Get active alerts"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    region = request.args.get('region', 'all')
-    
-    if region == 'all':
-        c.execute('''SELECT id, title, message, severity, timestamp 
-                     FROM alerts WHERE active = 1 
-                     ORDER BY timestamp DESC''')
-    else:
-        c.execute('''SELECT id, title, message, severity, timestamp 
-                     FROM alerts WHERE active = 1 AND affected_regions = ?
-                     ORDER BY timestamp DESC''', (region,))
-    
-    alerts = [{
-        'id': row[0],
-        'title': row[1],
-        'message': row[2],
-        'severity': row[3],
-        'timestamp': row[4]
-    } for row in c.fetchall()]
-    
-    conn.close()
-    return jsonify({'success': True, 'alerts': alerts})
-
-@app.route('/api/patterns', methods=['GET'])
-def api_patterns():
-    """Get top scam patterns"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    c.execute('''SELECT pattern, pattern_type, occurrences, last_seen 
-                 FROM patterns 
-                 ORDER BY occurrences DESC LIMIT 20''')
-    
-    patterns = [{
-        'pattern': row[0],
-        'type': row[1],
-        'occurrences': row[2],
-        'last_seen': row[3]
-    } for row in c.fetchall()]
-    
-    conn.close()
-    return jsonify({'success': True, 'patterns': patterns})
-
-@app.route('/api/stats', methods=['GET'])
-def api_stats():
-    """Get network statistics"""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    
-    c.execute('SELECT COUNT(*) FROM users')
-    total_users = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM reports')
-    total_reports = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM reports WHERE verified = 1')
-    verified_reports = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM alerts WHERE active = 1')
-    active_alerts = c.fetchone()[0]
-    
-    c.execute('SELECT COUNT(*) FROM reports WHERE timestamp > datetime("now", "-24 hours")')
-    reports_24h = c.fetchone()[0]
-    
-    conn.close()
-    
-    return jsonify({
-        'success': True,
-        'stats': {
-            'total_users': total_users,
-            'total_reports': total_reports,
-            'verified_reports': verified_reports,
-            'active_alerts': active_alerts,
-            'reports_last_24h': reports_24h
+    def _get_default_stats(self):
+        """Return default statistics structure"""
+        return {
+            "total_reports": 0,
+            "unique_scams": 0,
+            "top_scam_types": {},
+            "top_targeted_platforms": {},
+            "reports_by_day": {},
+            "last_updated": str(datetime.datetime.now())
         }
-    })
+    
+    def _load_json(self, filepath, default):
+        """Load JSON data from file"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return default
+    
+    def _save_json(self, filepath, data):
+        """Save JSON data to file"""
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    
+    def _generate_scam_hash(self, scam_data: Dict) -> str:
+        """Generate unique hash for a scam based on its content"""
+        # Create a string from key identifying features
+        identifying_string = f"{scam_data.get('url', '')}|{scam_data.get('title', '')}|{scam_data.get('content', '')[:200]}"
+        return hashlib.sha256(identifying_string.encode()).hexdigest()[:16]
+    
+    def report_scam(self, 
+                    reporter_id: str,
+                    scam_type: str,
+                    url: str = "",
+                    title: str = "",
+                    content: str = "",
+                    platform: str = "unknown",
+                    screenshot: Optional[str] = None,
+                    additional_info: Dict = None) -> Dict:
+        """
+        Report a new scam to the community network
+        
+        Args:
+            reporter_id: Anonymous user ID or email
+            scam_type: Type of scam (phishing, fake store, impersonation, etc.)
+            url: URL where scam was found
+            title: Title of the scam content
+            content: Description or content of the scam
+            platform: Platform where scam was found (email, website, social media)
+            screenshot: Base64 encoded screenshot (optional)
+            additional_info: Any additional information
+            
+        Returns:
+            Dict with report status and scam hash
+        """
+        if additional_info is None:
+            additional_info = {}
+            
+        # Generate unique hash for this scam
+        scam_hash = self._generate_scam_hash({
+            'url': url,
+            'title': title,
+            'content': content
+        })
+        
+        # Check if this scam was already reported
+        existing_alert = self._find_existing_alert(scam_hash, url)
+        
+        if existing_alert:
+            # Update existing alert with new report
+            existing_alert['report_count'] += 1
+            existing_alert['last_reported'] = str(datetime.datetime.now())
+            existing_alert['reporter_ids'].append(reporter_id)
+            
+            # Update confidence score based on reports
+            confidence = min(existing_alert['report_count'] * 10, 99)
+            existing_alert['community_confidence'] = confidence
+            
+            # Add to blocklist if confidence is high
+            if confidence >= 70 and url and url not in self.blocklist:
+                self._add_to_blocklist(url, scam_hash, scam_type, confidence)
+            
+            status = "updated"
+            scam_id = existing_alert['scam_id']
+        else:
+            # Create new alert
+            scam_id = scam_hash
+            new_alert = {
+                'scam_id': scam_id,
+                'scam_type': scam_type,
+                'url': url,
+                'title': title,
+                'content': content,
+                'platform': platform,
+                'first_reported': str(datetime.datetime.now()),
+                'last_reported': str(datetime.datetime.now()),
+                'report_count': 1,
+                'reporter_ids': [reporter_id],
+                'community_confidence': 10,  # Start with 10% confidence
+                'screenshot': screenshot,
+                'additional_info': additional_info,
+                'status': 'active'  # active, confirmed, false_positive
+            }
+            self.alerts.append(new_alert)
+            
+            # If URL is provided, add to blocklist with initial confidence
+            if url:
+                self._add_to_blocklist(url, scam_id, scam_type, 10)
+            
+            status = "new"
+        
+        # Update statistics
+        self._update_stats(scam_type, platform)
+        
+        # Save all data
+        self._save_json(self.alerts_file, self.alerts)
+        self._save_json(self.blocklist_file, self.blocklist)
+        self._save_json(self.stats_file, self.stats)
+        
+        return {
+            'status': status,
+            'scam_id': scam_id,
+            'message': f"Scam reported successfully! Community confidence: {self._get_confidence(scam_id)}%",
+            'community_confidence': self._get_confidence(scam_id)
+        }
+    
+    def _find_existing_alert(self, scam_hash: str, url: str) -> Optional[Dict]:
+        """Find if a scam already exists in the database"""
+        # First try by hash
+        for alert in self.alerts:
+            if alert.get('scam_id') == scam_hash:
+                return alert
+        
+        # If URL is provided, try by URL
+        if url:
+            for alert in self.alerts:
+                if alert.get('url') == url and url:
+                    return alert
+        
+        return None
+    
+    def _add_to_blocklist(self, url: str, scam_id: str, scam_type: str, confidence: int):
+        """Add a URL to the community blocklist"""
+        self.blocklist[url] = {
+            'scam_id': scam_id,
+            'scam_type': scam_type,
+            'confidence': confidence,
+            'added': str(datetime.datetime.now()),
+            'report_count': self._get_report_count(scam_id)
+        }
+    
+    def _update_stats(self, scam_type: str, platform: str):
+        """Update statistics with new report"""
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        
+        # Update total reports
+        self.stats['total_reports'] += 1
+        self.stats['unique_scams'] = len(self.alerts)
+        
+        # Update scam type counts
+        self.stats['top_scam_types'][scam_type] = self.stats['top_scam_types'].get(scam_type, 0) + 1
+        
+        # Update platform counts
+        self.stats['top_targeted_platforms'][platform] = self.stats['top_targeted_platforms'].get(platform, 0) + 1
+        
+        # Update daily reports
+        self.stats['reports_by_day'][today] = self.stats['reports_by_day'].get(today, 0) + 1
+        
+        # Keep only last 30 days of daily stats
+        if len(self.stats['reports_by_day']) > 30:
+            oldest = min(self.stats['reports_by_day'].keys())
+            del self.stats['reports_by_day'][oldest]
+        
+        self.stats['last_updated'] = str(datetime.datetime.now())
+    
+    def _get_report_count(self, scam_id: str) -> int:
+        """Get the number of reports for a specific scam"""
+        for alert in self.alerts:
+            if alert['scam_id'] == scam_id:
+                return alert['report_count']
+        return 0
+    
+    def _get_confidence(self, scam_id: str) -> int:
+        """Get community confidence for a scam"""
+        for alert in self.alerts:
+            if alert['scam_id'] == scam_id:
+                return alert['community_confidence']
+        return 0
+    
+    def check_url(self, url: str) -> Dict:
+        """Check if a URL is in the community blocklist"""
+        if url in self.blocklist:
+            block_info = self.blocklist[url]
+            return {
+                'blocked': True,
+                'confidence': block_info['confidence'],
+                'scam_type': block_info['scam_type'],
+                'report_count': block_info['report_count'],
+                'message': f"This URL has been reported {block_info['report_count']} times as a {block_info['scam_type']} scam"
+            }
+        return {'blocked': False}
+    
+    def check_content(self, content: str) -> Dict:
+        """Check if content matches any reported scams"""
+        content_lower = content.lower()
+        matches = []
+        
+        for alert in self.alerts:
+            # Simple content matching (can be enhanced with ML later)
+            alert_content = alert.get('content', '').lower()
+            if alert_content and len(alert_content) > 50:  # Only check substantial content
+                # Check for significant overlap
+                words = set(alert_content.split())
+                content_words = set(content_lower.split())
+                common_words = words.intersection(content_words)
+                
+                if len(common_words) >= 5:  # If 5+ words match
+                    match_score = len(common_words) / len(words) * 100
+                    if match_score > 30:  # If more than 30% content matches
+                        matches.append({
+                            'scam_id': alert['scam_id'],
+                            'scam_type': alert['scam_type'],
+                            'match_score': round(match_score, 2),
+                            'confidence': alert['community_confidence']
+                        })
+        
+        if matches:
+            # Sort by match score
+            matches.sort(key=lambda x: x['match_score'], reverse=True)
+            return {
+                'matches_found': True,
+                'matches': matches[:3],  # Return top 3 matches
+                'warning': "This content matches previously reported scams"
+            }
+        
+        return {'matches_found': False}
+    
+    def get_recent_alerts(self, limit: int = 10) -> List[Dict]:
+        """Get most recent scam alerts"""
+        sorted_alerts = sorted(self.alerts, 
+                             key=lambda x: x['last_reported'], 
+                             reverse=True)
+        return sorted_alerts[:limit]
+    
+    def get_top_scams(self, limit: int = 5) -> List[Dict]:
+        """Get scams with most reports"""
+        sorted_by_reports = sorted(self.alerts, 
+                                  key=lambda x: x['report_count'], 
+                                  reverse=True)
+        return sorted_by_reports[:limit]
+    
+    def get_statistics(self) -> Dict:
+        """Get community statistics"""
+        return {
+            'total_reports': self.stats['total_reports'],
+            'unique_scams': self.stats['unique_scams'],
+            'active_protections': len(self.blocklist),
+            'top_scam_types': dict(Counter(self.stats['top_scam_types']).most_common(5)),
+            'top_platforms': dict(Counter(self.stats['top_targeted_platforms']).most_common(5)),
+            'reports_today': self.stats['reports_by_day'].get(
+                datetime.datetime.now().strftime('%Y-%m-%d'), 0
+            ),
+            'last_updated': self.stats['last_updated']
+        }
 
-if __name__ == '__main__':
-    print("="*60)
-    print("🌐 ALERT NETWORK - Community Scam Detection")
-    print("="*60)
-    print("✅ Server starting on port 5003...")
-    print("🌍 Dashboard: http://localhost:5003")
-    print("📊 API: http://localhost:5003/api/stats")
-    print("="*60)
-    app.run(host='0.0.0.0', port=5003, debug=True)
+# Initialize global alert network instance
+alert_network = AlertNetwork()
