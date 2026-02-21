@@ -1,0 +1,3 @@
+2026-02-20 14:41:25.565133 - Model trained manually. Accuracy: 0.8000
+2026-02-20 14:42:14.951892 - Auto-added new file: aman.wav
+2026-02-20 18:13:30.203863 - Auto-added new file: aman.wav
