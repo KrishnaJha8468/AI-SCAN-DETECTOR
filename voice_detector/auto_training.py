@@ -12,11 +12,11 @@ from config_and_utils import (
 from config_and_utils import is_duplicate_file, load_model
 
 NEW_SAMPLE_COUNTER = 0
-MODEL_HISTORY_FILE = "training_history.json"
+MODEL_HISTORY_FILE = "training__history.json"
 MODEL_VERSION_COUNTER = 1
 
 
-def save_training_history(entry):
+def save_training_history(entry): 
     """
     Save structured training metadata to JSON file.
     """
