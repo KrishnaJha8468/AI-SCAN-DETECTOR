@@ -2,3 +2,5 @@
 2026-02-20 14:42:14.951892 - Auto-added new file: aman.wav
 2026-02-20 18:13:30.203863 - Auto-added new file: aman.wav
 2026-02-21 16:11:14.816916 - Model trained manually. Accuracy: 0.5714
+2026-02-21 21:58:44.035956 - Auto-added | aman.wav | GENUINE | Confidence: 0.9338 | New Count: 1
+2026-02-22 09:17:56.014401 - Skipped auto-add | aman.wav already exists

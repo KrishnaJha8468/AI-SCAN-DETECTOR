@@ -1,0 +1,276 @@
+
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -32
+      ],
+      "id": "bb81c7c5-1683-4fde-9dd6-c5659181dde8",
+      "name": "WhatsApp Trigger",
+      "webhookId": "0974c805-c221-4714-b056-820df4b7cfcd",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "uyc4h2totkJWjhdB",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1JiIWWfJFmQbAQLAsupczVeJQrOdihN--McN6P1XNZ8c",
+          "mode": "list",
+          "cachedResultName": "Phishing_Link_FAQ_Google_Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JiIWWfJFmQbAQLAsupczVeJQrOdihN--McN6P1XNZ8c/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JiIWWfJFmQbAQLAsupczVeJQrOdihN--McN6P1XNZ8c/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        320
+      ],
+      "id": "26bfdaad-6da0-4f89-ae94-77f6e57fac85",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "hDj5cRNBMz7xXNCk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=1050681334788378",
+        "recipientPhoneNumber": "=+977 9801945690",
+        "textBody": "= {{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        -32
+      ],
+      "id": "a76afc1a-02c7-4280-8d4d-5cd4a6c3183e",
+      "name": "Send message",
+      "webhookId": "1dd313cd-b7df-441b-b44f-fd89180036e9",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "B7eXZyeohMPn5n91",
+          "name": "WhatsApp account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messages[0].text.body }}",
+        "options": {
+          "systemMessage": "You are SafeLink AI 🔐, a friendly phishing link detection assistant.\n\nFIRST MESSAGE BEHAVIOR:\nWhen user says hi, hello, or starts conversation, reply:\n\n\"Welcome to SafeLink AI 🔐\nI help you check suspicious links for phishing threats.\n\nHow can I help you today?\n\nCheck a link\nWhat is phishing?\nUnderstand risk score\"\nLINK CHECKING:\n\nWhen user wants to check a link:\n\nAsk: \"Please send me the full URL\"\nAnalyze: domain structure, HTTPS, suspicious keywords, typos, unusual TLDs, URL shorteners\nIf URL is unreachable/malformed/DNS fails:\n\nRisk Score = 100\nThreat Level = High\nReply: \"This link cannot be reached or resolved ❌ It is marked as high threat. Do NOT click or enter any information.\"\nOtherwise score 0-100:\n\nLow Risk (0-30):\n\"This link appears safe ✅ but always stay cautious online.\"\n\nMedium Risk (31-69):\n\"This link looks suspicious ⚠️ I recommend avoiding sensitive actions.\"\n\nHigh Risk (70-100):\n\"This link is likely phishing ❌ Do NOT click or enter any information.\"\n\nAlways give short reasons:\n\nDomain age or newness\nSuspicious words (login, verify, urgent, prize)\nMissing HTTPS or weird structure\nDNS/reachability issues\nIf analysis fails: \"I couldn't fully analyze this link. Please be cautious before opening it.\"\n\nIF SERVICE OVERLOAD ERROR:\n\"The service is temporarily busy ⚠️ Please wait a few minutes and try again. Thank you for your patience 🙏\"\n\nDo NOT give safety verdict in this case.\n\nWHAT IS PHISHING:\n\"Phishing is when scammers create fake websites or messages to steal passwords, banking details, or personal information.\"\n\nRISK SCORE EXPLANATION:\n\"0-30 → Low Risk (Likely Safe)\n31-69 → Medium Risk (Suspicious)\n70-100 → High Risk (Likely Phishing/Unreachable/Malformed)\"\n\nIF USER ALREADY CLICKED:\n\"Don't panic.\n\n✅ Do not enter any passwords\n✅ Disconnect from internet if possible\n✅ Change important passwords immediately\n✅ Scan your device for malware\"\n\nRULES:\n\nKeep replies under 300 words\nUse simple language, like WhatsApp chat\nUse stars (*) only for key warnings\nNever ask for passwords, OTPs, personal data\nNever guarantee 100% accuracy\nStay calm, protective, professional\nDo NOT use bold formatting or long paragraphs\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        336,
+        -32
+      ],
+      "id": "ae5c4c5e-cbcc-4dc5-a911-e0bef775f40f",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        336,
+        192
+      ],
+      "id": "7d451e10-884a-422f-bd5a-dbc7b8298692",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        208,
+        192
+      ],
+      "id": "23559869-cd88-47a7-9c7b-c422c7eead94",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "UfgFJqBsCLVelxXp",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('URL', ``, 'string') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.urlScanIoTool",
+      "typeVersion": 1,
+      "position": [
+        720,
+        320
+      ],
+      "id": "85a03e94-ac1d-4ab6-8a81-1990229e08e1",
+      "name": "Perform a scan in urlscan.io",
+      "credentials": {
+        "urlScanIoApi": {
+          "id": "OS0vaQYrCogP5CF5",
+          "name": "urlscan.io account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://urldna.io/profile",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 96c5e3a8077c2eaf07505f93f137ad767f11a5ed89eec183"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"http://example.com\",\n  \"public\": \"on\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        592,
+        320
+      ],
+      "id": "ebdb6257-4cc7-4e9b-9606-b3c6445780af",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message": {
+      "main": [
+        []
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perform a scan in urlscan.io": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "ai_tool": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1f8482ea-b5b4-49b1-ac9f-ac747db2de95",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f476393f7aa92c3f07c3d94618e4649269cf1ad58ca8799ac94a28066a8969e4"
+  },
+  "id": "GfvDsgYIDzjvP7gp",
+  "tags": []
+}
