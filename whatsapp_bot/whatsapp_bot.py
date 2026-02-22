@@ -112,7 +112,7 @@ class ContextualAnalyzer:
         timestamp = datetime.now()
         
         # Get regular analysis first
-        urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+])+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', message)
+        urls = re.findall(r'http[s]?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9.-]+\.(?:org|com|net|tk|ml|php|xyz|info|biz|servebbs)[^\s]*', message)
         
         text_score, text_findings = text_analyzer.analyze(message)
         ai_score, ai_findings = ai_detector.analyze(message)
@@ -126,13 +126,17 @@ class ContextualAnalyzer:
         if urls:
             url_score, url_findings = url_analyzer.analyze(urls[0])
         
-        # Combine scores with weights
+# Combine scores with weights
         total_score = (
-            text_score * 0.2 +      # Traditional urgency (lower weight)
-            ai_score * 0.15 +        # AI detection
-            social_score * 0.6 +     # Social engineering (higher weight)
-            url_score * 0.3           # URL risk
+            text_score * 0.2 +
+            ai_score * 0.15 +
+            social_score * 0.6 +
+            url_score * 0.3
         )
+
+        # If URL is HIGH RISK — override total score
+        if url_score >= 70:
+            total_score = max(total_score, url_score)
         
         # Combine findings
         all_findings = []
@@ -218,8 +222,8 @@ def init_db():
 init_db()
 
 # Twilio WhatsApp credentials
-TWILIO_ACCOUNT_SID = 'TWILIO_ACCOUNT_SID'  
-TWILIO_AUTH_TOKEN = 'TWILIO_AUTH_TOKEN'  
+TWILIO_ACCOUNT_SID = 'AC416a37c5eb2ff3dfba89ef9ba2c56411'  
+TWILIO_AUTH_TOKEN = '7380f418667fe0d730411be96208f21f'  
 TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886'         
 TWILIO_PHONE_NUMBER = '+18783091374'                        
 
@@ -241,6 +245,50 @@ def webhook():
         response = MessagingResponse()
         reply = response.message()
         
+        # ===== FRIENDLY CASUAL REPLIES =====
+        casual_replies = {
+            "hello": "Hey! 👋 How are you? Send me any suspicious message and I'll check it for scams!",
+            "hi": "Hi there! 😊 I'm your AI Scam Detector bot. Send me any message or link to check!",
+            "hey": "Hey! 👋 Send me any suspicious message and I'll analyze it instantly!",
+            "what's up": "All good here! 😄 Send me any message or link you want me to scan!",
+            "whats up": "All good! 😄 Send me any suspicious message to analyze!",
+            "how are you": "I'm great and always protecting you! 🛡️ Send me anything suspicious!",
+            "ok": "Got it! 👍 Send me any message or link to scan for scams!",
+            "okay": "Okay! 😊 Send me any suspicious message to analyze!",
+            "thanks": "You're welcome! 😊 Stay safe out there! 🛡️",
+            "thank you": "Happy to help! 😊 Remember — when in doubt, send it to me!",
+            "bye": "Goodbye! 👋 Stay safe and scam-free! 🛡️",
+            "good morning": "Good morning! 🌞 Ready to check any suspicious messages today?",
+            "good afternoon": "Good afternoon! 😊 Send me anything that looks fishy!",
+            "good evening": "Good evening! 🌙 Still protecting you 24/7! Send me any links to check.",
+            "help": "🛡️ *How to use me:*\n\n• Send any message - I'll check for scams\n• Send any link - I'll analyze it\n• Type 'history' to see your scans\n\nI detect: AI scams, phishing, typosquatting, and social engineering!",
+            "who are you": "I'm your AI Scam Detector bot! 🤖 I analyze messages and links to protect you from scams, phishing, and fraud. Send me anything suspicious!",
+            "what can you do": "I can:\n✅ Detect scam messages\n✅ Analyze suspicious links\n✅ Catch AI-generated scams\n✅ Identify social engineering\n✅ Track your scan history\n\nTry me! Send any message or link!",
+        }
+        
+        # Check if casual message (case insensitive)
+        msg_lower = incoming_msg.lower().strip()
+        
+        if msg_lower in casual_replies:
+            print(f"💬 Casual reply sent: {msg_lower}")
+            reply.body(casual_replies[msg_lower])
+            return str(response)
+        
+        # Also check for partial matches (optional)
+        casual_keywords = {
+            "hi": casual_replies["hi"],
+            "hello": casual_replies["hello"],
+            "hey": casual_replies["hey"],
+            "thank": casual_replies["thanks"],
+        }
+        
+        for keyword, reply_text in casual_keywords.items():
+            if keyword in msg_lower and len(msg_lower) < 20:  # Short messages only
+                print(f"💬 Keyword match: {keyword}")
+                reply.body(reply_text)
+                return str(response)
+        
+        # ===== SCAM ANALYSIS (if not casual) =====
         # Analyze the message
         result = analyze_content(incoming_msg, sender)
         
