@@ -11,13 +11,14 @@ EMAIL_SETTINGS = {
     'smtp_port': 587,
     
     # Your detection email address
-    'email_address': 'detect@yourproject.com',
-    'email_password': 'your-app-password',
+    'email_address': 'krishnaeclipsee@gmail.com',
+    'email_password': 'your-real-password-here',
     
     # Email subject prefix for detection
     'scan_prefix': '#scan',
     
     # Database file for storing scans
+
     'database_file': 'email_scans.db'
 }
 

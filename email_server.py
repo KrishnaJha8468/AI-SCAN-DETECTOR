@@ -157,6 +157,41 @@ class EmailForwardingServer:
         
         # Calculate combined score
         combined_score, components = self.scoring_engine.calculate_risk(text_result, url_result)
+
+
+        # ===== ADD HERE — Extra Email Scam Checks =====
+        email_lower = content.lower()
+        all_findings = []
+
+        # Gift card scam
+        if any(w in email_lower for w in ['gift card', 'google play', 'itunes', 'steam card']):
+            combined_score = min(combined_score + 40, 100)
+            all_findings.append("🎁 Gift card payment requested")
+
+        # Fake job scam
+        if any(w in email_lower for w in ['work from home', 'data entry', 'earn per day', 'per month']):
+            combined_score = min(combined_score + 30, 100)
+            all_findings.append("💼 Fake job offer detected")
+
+        # Security deposit fraud
+        if any(w in email_lower for w in ['security deposit', 'registration fee', 'processing fee', 'small fee']):
+            combined_score = min(combined_score + 40, 100)
+            all_findings.append("💰 Upfront fee scam detected")
+
+        # Suspicious domains
+        if any(d in email_lower for d in ['.tk', '.ml', '.ga', '.cf', '-verify', '-secure', '-login']):
+            combined_score = min(combined_score + 35, 100)
+            all_findings.append("🔗 Suspicious domain detected")
+
+        # Unrealistic salary
+        if re.search(r'\$[3-9],000|\$[1-9][0-9],000', content):
+            combined_score = min(combined_score + 25, 100)
+            all_findings.append("💵 Unrealistic salary offer")
+
+        # Override if URL is high risk
+        if url_score >= 70:
+            combined_score = max(combined_score, url_score)
+        # ===== END OF EXTRA CHECKS =====
         
         # Apply AI boost
         if ai_score >= 30:
@@ -174,7 +209,6 @@ class EmailForwardingServer:
         risk_level, _ = self.scoring_engine.get_risk_level(combined_score)
         
         # Prepare findings summary
-        all_findings = []
         if text_findings:
             all_findings.extend(text_findings[:3])
         if url_findings:
@@ -267,7 +301,7 @@ class EmailForwardingServer:
             imap.select('INBOX')
             
             # Search for emails with scan prefix in subject
-            search_criteria = f'(SUBJECT "{self.settings["scan_prefix"]}")'
+            search_criteria = f'(UNSEEN SUBJECT "{self.settings["scan_prefix"]}")'
             result, data = imap.search(None, search_criteria)
             
             if result != 'OK' or not data[0]:
@@ -302,6 +336,7 @@ class EmailForwardingServer:
                 if not content:
                     print(f"⚠️ No content found in email from {sender_email}")
                     continue
+                print(f"📧 Content preview: {content[:200]}")
                 
                 # Analyze the email
                 result = self.analyze_forwarded_email(sender_email, subject, content)
